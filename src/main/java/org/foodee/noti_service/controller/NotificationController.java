@@ -2,6 +2,7 @@ package org.foodee.noti_service.controller;
 
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.foodee.noti_service.entity.Notification;
 import org.foodee.noti_service.service.EmailService;
 import org.foodee.noti_service.service.NotificationService;
 import org.springframework.http.MediaType;
@@ -66,10 +67,10 @@ public class NotificationController {
     @GetMapping("/api/notifications/send")
     public ResponseEntity<Map<String, String>> sendNotification(
             @RequestParam String userId,
-            @RequestParam String message) {
+            @RequestParam Long notificationId) {
 
         // Gửi thông báo tới userId qua SSE
-        notificationService.sendMessageToUser(userId, message);
+        notificationService.sendMessageToUser(userId, notificationId);
 
         // Trả về phản hồi JSON hợp lệ
         Map<String, String> response = new HashMap<>();
@@ -85,10 +86,10 @@ public class NotificationController {
     public SseEmitter subscribeToNotifications(@RequestParam String userId) {
         SseEmitter emitter = new SseEmitter(0L);
         notificationService.addSession(userId, emitter);
-
-        for (int i = 0; i < 10; i++) {
-            notificationService.sendMessageToUser(userId, "Notification " + i);
-        }
+        notificationService.sendUnreadNoti(userId);
+//        for (int i = 0; i < 10; i++) {
+//            notificationService.sendMessageToUser(userId, "Notification " + i);
+//        }
 
         emitter.onCompletion(() -> notificationService.removeSession(userId));
         emitter.onTimeout(() -> notificationService.removeSession(userId));

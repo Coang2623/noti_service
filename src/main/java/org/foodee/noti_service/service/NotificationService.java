@@ -1,7 +1,9 @@
 package org.foodee.noti_service.service;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.foodee.noti_service.entity.Notification;
+import org.foodee.noti_service.repository.NotificationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -13,7 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
+@AllArgsConstructor
 public class NotificationService {
+
+    private final NotificationRepository notificationRepository;
 
     // Lưu trữ các kết nối SSE của mỗi user
     private final Map<String, SseEmitter> userSessions = new ConcurrentHashMap<>();
@@ -35,22 +40,27 @@ public class NotificationService {
         log.info("Session added for user: {}", userId);
     }
 
+    public void sendUnreadNoti(String userId){
+        List<Notification> unreads = notificationRepository.findByUserId(userId);
+        if (unreads.size() == 0)
+            log.info("No unread notification for user: {}", userId);
+        else
+            log.info("You have {} notifications", unreads.size());
+        unreads.forEach(noti -> {
+            sendMessageToUser(userId, noti.getNotificationId());
+        });
+    }
+
     // Gửi thông báo tới user cụ thể
-    public void sendMessageToUser(String userId, String message) {
-        Notification notification = Notification.builder()
-                .notificationId(UUID.randomUUID().getLeastSignificantBits())
-                .notificationTitle("New Notification")
-                .notificationMessage(message)
-                .notificationIsRead(false)
-                .notificationCreatedAt(LocalDateTime.now())
-                .build();
+    public void sendMessageToUser(String userId, Long notificationId) {
+        Notification noti = notificationRepository.findById(notificationId).orElse(null);
         SseEmitter emitter = userSessions.get(userId);
         if (emitter != null) {
             try {
                 // Gửi sự kiện với tên 'order-status' và dữ liệu là message
                 emitter.send(SseEmitter.event()
-                        .name("order-status")
-                        .data(notification)
+                        .name("new-order")
+                        .data(noti)
                         .id("message-id-" + System.currentTimeMillis())  // ID cho sự kiện
                         .reconnectTime(3000));  // Thời gian reconnect nếu có sự cố
                 log.info("Message sent to user: {}", userId);
